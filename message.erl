@@ -1,21 +1,22 @@
 -module(message).
 
 %Two arguments in start: number of processes and number of rounds
--export([start/2, createProcess/3, passToken/0, controllToken/2]).
+-export([start/2, createProcess/3, passToken/0, controllerProcess/2]).
 
-controllToken(0, [head|_]) ->
-     head ! stop,
+controllerProcess(0, [Head|_]) ->
+     Head ! stop,
      done;
 
-controllToken(N, Lst) ->
-	[head | tail] = Lst,
-    head ! {self(), token, tail},
+controllerProcess(N, Lst) ->
+	[Head | Tail] = Lst,
+	io:fwrite("Controller arrived, Head = ~p, Tail = ~p\n", [Head, Tail]),
+    Head ! {self(), token, Tail},
     
     receive
 		token ->
 			io:fwrite("Round finished\n")
     end,		   
-    controllToken(N - 1, Lst).
+    controllerProcess(N - 1, Lst).
     
 
 passToken() ->
@@ -23,27 +24,24 @@ passToken() ->
 		stop ->
 			io:fwrite("Stop received\n"),
     	    done;
-		{controller, token, [head|[]]} ->		
-		    controller ! token, 
+		{Controller, token, []} ->
+			io:fwrite("Last in the list\n"),		
+		    Controller ! token, 
 		    passToken();
-		{controller, token, [head|tail]} ->		
-	        head ! {controller, token, tail},
+		{Controller, token, [Head|Tail]} ->	
+			io:fwrite("Token received\n"),	
+	        Head ! {Controller, token, Tail},
 	        passToken()
     end.
 
 	    
-createProcess(0, Lst, Rounds) -> 
-    io:fwrite("~w~n", [Lst]),
-    ok;
-
-    createProcess(N, Lst, Rounds) when N > 1 ->
-	io:fwrite("Hello\n"),
+createProcess(N, Lst, Rounds) when N > 1 ->
 	Pid = spawn(message, passToken, []),
         createProcess(N-1, [Pid | Lst], Rounds);
 
-    createProcess(N, Lst, Rounds) when N == 1 ->
-	io:fwrite("Last controller\n"),
-	spawn(message, controllToken, [Rounds, Lst]).
+createProcess(N, Lst, Rounds) when N == 1 ->
+	io:format("~p~n", [Lst]),
+	spawn(message, controllerProcess, [Rounds, Lst]).
 	
 
 start(Threads, Rounds) ->
