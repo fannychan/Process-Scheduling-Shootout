@@ -17,10 +17,9 @@ typedef struct proc_arg_t {
   int id;
 } proc_arg_t;
 
-pthread_mutex_t mtx;
-pthread_barrier_t barrier;
-//pthread_cond_t cnd;
+struct timespec start, stop;
 
+pthread_barrier_t barrier;
 
 void *init(void *arg){
   int rounds = ((proc_arg_t*)arg) -> rounds;
@@ -34,59 +33,47 @@ void *init(void *arg){
   pthread_cond_t next_cond = ((proc_arg_t*)arg) -> next -> sync.cnd;
 
 
-  int prev_token = ((proc_arg_t*)arg) -> prev -> sync.token;
-  int next_token = ((proc_arg_t*)arg) -> sync.token;
+  int* prev_token = &((proc_arg_t*)arg) -> prev -> sync.token;
+  int* next_token = &((proc_arg_t*)arg) -> sync.token;
   
-  printf("My id is: %d, my prev is: %d, my next is: %d and my token is %d\n", id, prev_id, next_id, next_token);
+  //printf("My id is: %d, my prev is: %d, my next is: %d and my token is %d\n", id, prev_id, next_id, *next_token);
 
   //wait for everyone to sign in
   pthread_barrier_wait(&barrier);
 
   while(rounds > 0){
   //grab lock of prev process
-  printf("Thread %d is trying to grab the %d lock with token which is: %d\n", id, prev_id, prev_token);
     pthread_mutex_lock(&prev_mtxp);
 
     //check if next_token is there, if not suspend on condition
-    /*block this thread until another thread signal cond.
-      while blocked, the mutex is released, then re-acquired before this thread is woken up and the call returns.
-     */
-   
-    while(prev_token == 0) {
-      int check = pthread_cond_wait(&cnd, &prev_mtxp);
-      printf("Status for cond %d for thread: %d, token is: %d\n", check, id, prev_token);
+    while(*prev_token == 0) {
+      pthread_cond_wait(&cnd, &prev_mtxp);
       pthread_mutex_unlock(&prev_mtxp);
     }
 
-    if(prev_token == 1) {
-      printf("Thread %d has taken the next_token\n", id);
-      prev_token = 0;
+    if(*prev_token == 1) {
+      *prev_token = 0;
     }
 
-    int unlock = pthread_mutex_unlock(&prev_mtxp);
-    printf("Unlock status for thread %d is: %d\n", id, unlock);
+    pthread_mutex_unlock(&prev_mtxp);
 
     //take mutex-lock and place next_token in next placeholder
+    pthread_mutex_lock(&mtxp);
+    *next_token = 1;
 
-    int check = pthread_mutex_lock(&mtxp);
-    printf("Thread %d takes new lock with status %d\n", id, check);
-    next_token = 1;
     //unlock and signal on condition
-
-    //printf("Thread %d status %d\n", id, next_token);
-
     pthread_cond_signal(&next_cond);
     pthread_mutex_unlock(&mtxp);
 
-      //pthread_cond_signal(&cnd);
-
     rounds--;
-    printf("Thread %d has %d rounds left\n", id, rounds);
   }
 
   pthread_barrier_wait(&barrier);
 }
-   
+
+static double converterToSeconds(struct timespec *ts){
+    return (double)ts->tv_sec + (double)ts->tv_nsec / 1000000000.0;
+};
 
 void bench(int p, int r){
 
@@ -113,44 +100,25 @@ void bench(int p, int r){
   //create all threads
   pthread_t *thrt = malloc(p * sizeof(pthread_t));
 
+
   for(int i = 0; i < p; i++){
+      if(i == p - 1) {   clock_gettime(CLOCK_MONOTONIC, &start); }
      pthread_create(&thrt[i], NULL, &init, &thrd[i]);
   }
 
   for(int i = 0; i <p; i++){
     pthread_join(thrt[i], NULL);
   }
+
+  clock_gettime(CLOCK_MONOTONIC, &stop);
+  double elapsedTime = converterToSeconds(&stop) - converterToSeconds(&start);
+  printf("Elapsed time: %f", elapsedTime);
   
-  printf("We are done\n");
 }
-/*
-
-  // take time
-  //struct timeval start, stop;
-
-
-  //let's wait for all to sign in
-  pthread_barrier_wait(&barrier);
-}
-
-*/
 
 int main() {
 
-  struct timeval start, stop;
-  bench(5, 1);
-  /*
-    gettimeofday(&start, NULL);
-
-
-    gettimeofday(&stop, NULL);
-
-    int s = stop.tv_sec - start.tv_sec;
-    int u = stop.tv_usec - start.tv_usec;
-    int t = s*1000000+u;
-    printf("%d\t%d\n", i, t);
-  }
-  */
+  bench(5, 2);
   return 0;
 }
 
