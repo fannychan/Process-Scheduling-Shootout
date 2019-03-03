@@ -17,6 +17,7 @@ typedef struct proc_arg_t {
   int id;
 } proc_arg_t;
 
+
 struct timespec start, stop;
 
 pthread_barrier_t barrier;
@@ -112,13 +113,24 @@ void bench(int p, int r){
 
   clock_gettime(CLOCK_MONOTONIC, &stop);
   double elapsedTime = converterToSeconds(&stop) - converterToSeconds(&start);
-  printf("Elapsed time: %f", elapsedTime);
-  
+  //printf("Elapsed time: %f", elapsedTime);
+
+  FILE *file_time;
+  fprintf(file_time, "\n%d,", p);
+
+  file_time = fopen("time", "w+");
+
+  fprintf(file_time, "%f,", elapsedTime);
+  fclose(file_time);
+
 }
 
 int main() {
+  //inner loop for running 10 times per thread number
 
-  bench(5, 2);
+  for(int threads = 5; threads < 100; threads+5){
+          bench(threads, 1);
+  }
   return 0;
 }
 
