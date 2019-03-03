@@ -36,7 +36,7 @@ void *init(void *arg){
 
   int* prev_token = &((proc_arg_t*)arg) -> prev -> sync.token;
   int* next_token = &((proc_arg_t*)arg) -> sync.token;
-  
+
   //printf("My id is: %d, my prev is: %d, my next is: %d and my token is %d\n", id, prev_id, next_id, *next_token);
 
   //wait for everyone to sign in
@@ -116,23 +116,19 @@ void bench(int p, int r){
   //printf("Elapsed time: %f", elapsedTime);
 
   FILE *file_time;
-  fprintf(file_time, "\n%d,", p);
+  file_time = fopen("time.txt", "w+");
+  fprintf(file_time, "%d\n", p);
 
-  file_time = fopen("time", "w+");
 
-  fprintf(file_time, "%f,", elapsedTime);
+  fprintf(file_time, "%f\n", elapsedTime);
   fclose(file_time);
 
 }
 
 int main() {
-  //inner loop for running 10 times per thread number
 
-  for(int threads = 5; threads < 100; threads+5){
-          bench(threads, 1);
+  for(int threads = 5; threads < 100; threads+=5){
+    bench(threads, 1);
   }
   return 0;
 }
-
-
-
